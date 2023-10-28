@@ -149,7 +149,8 @@ class Crawler(object):
     #print(search_url)
     # get page content
     if search_url in self.visited_list:
-        return [], self.index, [], search_url
+        print("why am i here ?")
+        return [], self.index, self.visited_list, search_url
     
     response = requests.get(search_url)
     host_url = get_host_url(search_url, self.rel_ab_path)
@@ -212,10 +213,10 @@ if __name__ == '__main__':
     # if not limited by libraries, we would be using nltk in the Crawler class to filter words out
     # unacceptable = ["the", "in", "or", "and", "to"]
 
-    #start_url = "https://vm009.rz.uos.de/crawl"
-    #relative_absolute_path = '/crawl'
-    start_url = "https://www.uni-osnabrueck.de/startseite/"
-    relative_absolute_path = False
+    start_url = "https://vm009.rz.uos.de/crawl"
+    relative_absolute_path = '/crawl'
+    #start_url = "https://www.uni-osnabrueck.de/startseite/"
+    #relative_absolute_path = False
     search_list = [start_url]
 
     index = {}
@@ -232,12 +233,16 @@ if __name__ == '__main__':
 
             # if not visited recently:
             #search_list, already_visisted += crawl(url, relative_absolute_path)
-            print(len(index))
-            print(len(search_list))
+            #print(len(index))
+            #print(len(search_list))
             crawly = Crawler(index, already_visisted, relative_absolute_path)
             aggregator = crawly(url)
             
-            search_list = list((set(search_list) and set(aggregator[0])) - set(already_visisted))
+            one = (set(search_list) | set(aggregator[0]))
+            two = (set(aggregator[2]) | set(already_visisted))
+            print(one)
+            print(two)
+            search_list = list(one - two)
             
             index = merge_dics(index, aggregator[1])
             already_visisted += aggregator[2]
@@ -247,10 +252,12 @@ if __name__ == '__main__':
             #exit()
 
             search_list = list(set(search_list))
-            print(len(search_list))
+            #print(len(search_list))
             already_visisted = list(set(already_visisted))
-
-            search_list.remove(url) if url in search_list else search_list
+            print("\n")
+            print(search_list)
+            print(already_visisted)
+            #search_list.remove(url)# if url in search_list else search_list
 
         itere += 1
     print(already_visisted)
@@ -271,9 +278,8 @@ if __name__ == '__main__':
     """
         with Pool(5) as p:
             aggregator = p.map(Crawler(index, already_visisted, relative_absolute_path), search_list)[0]
-            print(aggregator[0])
-            print(search_list)
-            search_list += aggregator[0]
+            
+            search_list = list((set(search_list) and set(aggregator[0])) - (set(aggregator[2]) and set(already_visisted)))
             index = merge_dics(index, aggregator[1])
             already_visisted += aggregator[2]
             url = aggregator[3]
@@ -286,7 +292,7 @@ if __name__ == '__main__':
         itere += 1
     
     print(already_visisted)
-     8.45s user 1.54s system 204% cpu 4.892 total
+    #8.45s user 1.54s system 204% cpu 4.892 total
     while 1:
         scores = {}
         print("\n \n")
