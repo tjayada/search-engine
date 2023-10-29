@@ -161,6 +161,21 @@ def merge_dics(dic_1, dic_2):
             dic_1[key] = value
     return dic_1
 
+
+def get_url_ordered(urls_with_scores):
+    """return list of urls by scores descending"""
+    sorted_scores = sorted(urls_with_scores.values(), reverse=True)
+    
+    sorted_urls = []
+    
+    for score in sorted_scores:
+        for k, v in urls_with_scores.items():
+            if score == v and k not in sorted_urls:
+                sorted_urls.append(k)
+                break
+    return sorted_urls, sorted_scores
+
+
 if __name__ == '__main__':
 
     # benchmarks
@@ -240,6 +255,8 @@ if __name__ == '__main__':
 
         for term in clean_query:
             scores = calculate_tf_idf(term, index, scores)
-    
-        print(scores)
-    
+
+        urls, scores = get_url_ordered(scores)
+
+        for u, s in zip(urls, scores):      
+            print(u, "           ", s)    
