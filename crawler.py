@@ -108,13 +108,13 @@ class Crawler(object):
     # this function should never be called, eventually remove after enough testing
     if search_url in self.visited_list:
         print("why am i here ?")
-        return [], self.index, self.visited_list, search_url
+        return [], self.index, search_url
 
     response = self.safe_connection(search_url)
     if not response:
         print("no response huh?")
         self.visited_list.append(search_url)
-        return [], self.index, self.visited_list, search_url
+        return [], self.index, search_url
     
     host_url = self.get_host_url(search_url, self.rel_ab_path)
     soup = BeautifulSoup(response.content, "html.parser")
@@ -127,7 +127,7 @@ class Crawler(object):
 
     self.visited_list.append(search_url)
 
-    return list_of_hrefs, self.index, self.visited_list, search_url
+    return list_of_hrefs, self.index, search_url
 
 
 
@@ -152,8 +152,11 @@ def calculate_tf_idf(term, index, scores):
     return scores
 
 
-def merge_dics(dic_1, dic_2):
+def merge_dics(dic_1, dic_2=False):
     """merge two different dictionaries without information loss"""
+    if not dic_2:
+        dic_1, dic_2 = dic_1
+    
     for key, value in dic_2.items():
         if key in dic_1:
             dic_1[key] = list(set(dic_1[key] + value))
@@ -176,6 +179,16 @@ def get_url_ordered(urls_with_scores):
     return sorted_urls, sorted_scores
 
 
+def pair_iterable(iterable):
+    """
+    pair iterable into two's
+    inpired by 
+    https://stackoverflow.com/questions/312443/how-do-i-split-a-list-into-equally-sized-chunks/74120449#74120449
+    """
+    args = [iter(iterable)] * 2
+    return zip(*args)
+
+
 if __name__ == '__main__':
 
     # benchmarks
@@ -188,6 +201,7 @@ if __name__ == '__main__':
     # 2.29s user 0.43s system 155% cpu 1.752 total
 
     # to-do
+    # clean up returns of Crawler, most of them are useless / to big (only need url not whole already_visited list)
     # make aggregation after multi faster (recursive, use multi to merge ?)
     # boolean to allow /en/ ?
     # boolean to allow switched to other webpages
@@ -217,9 +231,46 @@ if __name__ == '__main__':
                 search_list = old_search_list[:200]
             """
             with Pool(5) as p:
-                aggregator = []
+                #aggregator = []
                 aggregator = p.map(Crawler(index, already_visisted, relative_absolute_path), search_list)
 
+            # put every thing in respective lists, e.g
+            # one list with all hrefs, one with indeces etc.
+            # then set of hrefs becomes potential search_list
+            # already_visited should only be one url per worker, not list, then all combined is new already_visited
+            # then do the set minus thing to get true new search_list
+            # use worker pool for divide-&-conquer algo to merge indeces
+            # split indeces list into pairs of two --> iter input for worker
+            # worker uses dic_merge and returns merged_dics
+            # once all are finished, we see that indeces list ist still len() != 1
+            # so we do it again etc. 
+            """
+            list_of_hrefs = [agg[0] for agg in aggregator]
+            all_hrefs = [url for url_list in list_of_hrefs for url in url_list]
+            
+            already_visisted = already_visisted + [agg[2] for agg in aggregator]
+            
+            search_list =  list( set(all_hrefs) - set(already_visisted))
+
+            list_of_indeces = [agg[1] for agg in aggregator]
+
+
+            while len(list_of_indeces) != 1 and itere > 1:
+                #print(len(list_of_indeces))
+                if len(list_of_indeces) == 1:
+                    index = merge_dics(index, list_of_indeces[0])
+                    
+                else:
+                    pairs_of_indeces = pair_iterable(list_of_indeces)
+
+                    with Pool(5) as p:
+                        list_of_indeces = p.map(merge_dics, pairs_of_indeces)
+
+            #print("end :", len(list_of_indeces))
+
+            index = merge_dics(index, list_of_indeces[0])
+
+            """
             for agg in aggregator:
 
                 x = (set(search_list) | set(agg[0]))
@@ -231,7 +282,7 @@ if __name__ == '__main__':
 
             search_list = list(set(search_list))
             already_visisted = list(set(already_visisted))
-
+            
             print('len(search_list) :' ,len(search_list))
             print('len(already_visisted)' ,len(already_visisted))
             print("\n")
