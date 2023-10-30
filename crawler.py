@@ -15,11 +15,12 @@ def replace_punctuations(text):
 class Crawler(object):
   """crawl webpage for content and hrefs to other sites"""
 
-  def __init__(self, index, visited_list, rel_ab_path):
+  def __init__(self,rel_ab_path, not_allow=False, print_search_url=False):
     """initialize with variables other than iterable through Pool"""
-    self.index = index
-    self.visited_list = visited_list
+    self.index = {}
     self.rel_ab_path = rel_ab_path
+    self.not_allow = not_allow
+    self.print_search_url = print_search_url
 
   def get_all_hrefs(self, soup, host_url):
     """scrape url for hrefs that do not lead to other sites"""
@@ -63,16 +64,25 @@ class Crawler(object):
     
   def sanity_check(self, found_url):
     """check whether the url contains files or other not usable content"""
+    if self.not_allow:
+        for f in self.not_allow:
+            if re.search(f'({f})', found_url, re.IGNORECASE):
+                return False
+        
     return (not found_url[0] == '#' 
             and not re.search(r'(.pdf)', found_url, re.IGNORECASE)
             and not re.search(r'(.doc)', found_url, re.IGNORECASE) 
             and not re.search(r'(.xml)', found_url, re.IGNORECASE)
-            and not re.search(r'(.ics)', found_url, re.IGNORECASE)
+            and not re.search(r'(.php)', found_url, re.IGNORECASE)
+            and not re.search(r'(.ics)', found_url, re.IGNORECASE) # calendar
             and not re.search(r'(.jpg)', found_url, re.IGNORECASE)
             and not re.search(r'(.png)', found_url, re.IGNORECASE)
+            and not re.search(r'(.gif)', found_url, re.IGNORECASE)
             and not re.search(r'(.mp3)', found_url, re.IGNORECASE)
+            and not re.search(r'(type=)', found_url, re.IGNORECASE) # RSS feed
             and not re.search(r'(tel:)', found_url, re.IGNORECASE)
             and not re.search(r'(mailto:)', found_url, re.IGNORECASE)
+            and not re.search(r'(javascript:)', found_url, re.IGNORECASE)
             )
   def safe_connection(self, search_url):
     """in case the connection is broken, timed out or other things happen"""
@@ -105,41 +115,35 @@ class Crawler(object):
   def __call__(self, search_url):
     """apply all other functions by requesting page, looking through content and retrieving information"""
 
-    # this function should never be called, eventually remove after enough testing
-    if search_url in self.visited_list:
-        print("why am i here ?")
-        return [], self.index, search_url
-
     response = self.safe_connection(search_url)
+    if self.print_search_url:
+        print(search_url)
     if not response:
         print("no response huh?")
-        self.visited_list.append(search_url)
         return [], self.index, search_url
     
     host_url = self.get_host_url(search_url, self.rel_ab_path)
     soup = BeautifulSoup(response.content, "html.parser")
-    print(search_url)
     text = self.scrape_all_text(soup)
     text = self.replace_punctuations(text)
     self.tf_into_index(text, search_url)
 
     list_of_hrefs = self.get_all_hrefs(soup, host_url)
 
-    self.visited_list.append(search_url)
-
     return list_of_hrefs, self.index, search_url
 
 
 
-def calculate_tf_idf(term, index, scores):
+def calculate_tf_idf(term, index, scores, number_of_all_urls=False):
     """when index queried calculate term-frequency inverse-document-frequency to determine best match"""
     if term not in index:
         return scores
     urls_and_tfs = index[term]
     
     l = len(list(index.values()))
-    number_all_urls = len(set([list(index.values())[i][j][0] for i in range(l) for j in range(len(list(index.values())[i]))]))
-    idf = math.log(number_all_urls / len(urls_and_tfs), 10)
+    if not number_of_all_urls:
+        number_of_all_urls = len(set([list(index.values())[i][j][0] for i in range(l) for j in range(len(list(index.values())[i]))]))
+    idf = math.log(number_of_all_urls / len(urls_and_tfs), 10)
 
     list_of_url_idfs = [(tf[0], tf[1]*idf) for tf in urls_and_tfs]
 
@@ -156,12 +160,13 @@ def merge_dics(dic_1, dic_2=False):
     """merge two different dictionaries without information loss"""
     if not dic_2:
         dic_1, dic_2 = dic_1
-    
+
     for key, value in dic_2.items():
         if key in dic_1:
             dic_1[key] = list(set(dic_1[key] + value))
         else:
             dic_1[key] = value
+
     return dic_1
 
 
@@ -201,9 +206,23 @@ if __name__ == '__main__':
     # 2.29s user 0.43s system 155% cpu 1.752 total
 
     # to-do
-    # clean up returns of Crawler, most of them are useless / to big (only need url not whole already_visited list)
-    # make aggregation after multi faster (recursive, use multi to merge ?)
+    # disallow # in url ? or for two urls for same key to have some tf ?
+    # e.g
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM5             0.0017153155656649559
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM3             0.0017153155656649559
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM6             0.0017153155656649559
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html             0.0017153155656649559
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html?draft=1             0.0017153155656649559
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM2             0.0017153155656649559
+    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM1             0.0017153155656649559
+    # or disallow ?id= or ?draft=
+    # e.g.
+    # https://www.uni-luebeck.de/studium/studiengaenge/biophysik.html             0.000923188310320098
+    # https://www.uni-luebeck.de/studium/studiengaenge/biophysik.html?draft=1             0.000923188310320098
+    # https://www.uni-luebeck.de/studium/studiengaenge/molecular-life-science.html             0.000772675528876484
+    # https://www.uni-luebeck.de/studium/studiengaenge/molecular-life-science.html?draft=1             0.000772675528876484
     # boolean to allow /en/ ?
+    # if no result, try again later ? 
     # boolean to allow switched to other webpages
     # some index to remember connection, to draw graph of connections in the end (overkill but would be cool)
     # use 'auto-complete' by looking wheter term in query is in index (overkill but would be cool)
@@ -213,7 +232,17 @@ if __name__ == '__main__':
     
     #start_url = "https://www.uni-osnabrueck.de/startseite/"
     #start_url = "https://www.fh-kiel.de"
+    #start_url = "https://www.cogscispace.de"
+    #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
     #relative_absolute_path = False
+
+    not_allow = ["/en/"] # doesnt work for some reason
+    #not_allow = False
+    stop_after_crawl = False
+    print_search_url = True
+
+    crawler_worker = 4
+    merge_worker = 4
 
     search_list = [start_url]
     index = {}
@@ -224,89 +253,66 @@ if __name__ == '__main__':
         while len(search_list) != 0:
             
             print("iteration : ", itere)
-            
-            """ idea is to use smaller chunks of search_list to not spend too much time in aggregation loop aftwerwards or make aggregation faster
-            if len(search_list) > 200:
-                old_search_list = search_list.copy()
-                search_list = old_search_list[:200]
-            """
-            with Pool(5) as p:
-                #aggregator = []
-                aggregator = p.map(Crawler(index, already_visisted, relative_absolute_path), search_list)
 
-            # put every thing in respective lists, e.g
-            # one list with all hrefs, one with indeces etc.
-            # then set of hrefs becomes potential search_list
-            # already_visited should only be one url per worker, not list, then all combined is new already_visited
-            # then do the set minus thing to get true new search_list
-            # use worker pool for divide-&-conquer algo to merge indeces
-            # split indeces list into pairs of two --> iter input for worker
-            # worker uses dic_merge and returns merged_dics
-            # once all are finished, we see that indeces list ist still len() != 1
-            # so we do it again etc. 
-            """
+            # using multiple threads for crawling the webpage
+            with Pool(crawler_worker) as p:
+                aggregator = p.map(Crawler(relative_absolute_path, not_allow, print_search_url), search_list)
+            
+            # need to accumulate all the information from crawling 
             list_of_hrefs = [agg[0] for agg in aggregator]
             all_hrefs = [url for url_list in list_of_hrefs for url in url_list]
-            
             already_visisted = already_visisted + [agg[2] for agg in aggregator]
-            
             search_list =  list( set(all_hrefs) - set(already_visisted))
-
             list_of_indeces = [agg[1] for agg in aggregator]
 
+            # if odd number of indeces returned, we make even by removing last one
+            if len(list_of_indeces) % 2 != 0 and len(list_of_indeces) > 1:
+                odd_one_out = list_of_indeces[-1]
+                list_of_indeces = list_of_indeces[:-1]
+                index = merge_dics(index, odd_one_out)
+            
+            # merge all indices together using mix of multiple threads and divide-and-conquer
+            while len(list_of_indeces) > 1:
+                pairs_of_indeces = pair_iterable(list_of_indeces)
 
-            while len(list_of_indeces) != 1 and itere > 1:
-                #print(len(list_of_indeces))
-                if len(list_of_indeces) == 1:
-                    index = merge_dics(index, list_of_indeces[0])
-                    
-                else:
-                    pairs_of_indeces = pair_iterable(list_of_indeces)
-
-                    with Pool(5) as p:
-                        list_of_indeces = p.map(merge_dics, pairs_of_indeces)
-
-            #print("end :", len(list_of_indeces))
-
-            index = merge_dics(index, list_of_indeces[0])
-
-            """
-            for agg in aggregator:
-
-                x = (set(search_list) | set(agg[0]))
-                y = (set(agg[2]) | set(already_visisted))
-                    
-                search_list = list(x - y)
-                index = merge_dics(index, agg[1])
-                already_visisted += agg[2]
-
-            search_list = list(set(search_list))
-            already_visisted = list(set(already_visisted))
+                with Pool(merge_worker) as p:
+                    list_of_indeces = p.map(merge_dics, pairs_of_indeces)
+            
+            # circumvent special case when crawling resulted in no content being found
+            if list_of_indeces[0] != {}:
+                index = merge_dics(index, list_of_indeces[0])
             
             print('len(search_list) :' ,len(search_list))
             print('len(already_visisted)' ,len(already_visisted))
             print("\n")
-
+            
             itere += 1
     
+    # in case crawling takes to long ..
     except KeyboardInterrupt:
         pass
     
     print(already_visisted)
     print("\n")
     print(len(already_visisted))
+    number_of_all_urls = len(already_visisted)
     
+    # used mainly for benchmarks, usually you'd like to query as well
+    if stop_after_crawl:
+        exit()
+
+    # kinda stupid method to allow for unlimited user queries
     while 1:
         scores = {}
         print("\n \n")
         print("please query me :")
         user = input()
-
+        # clean up query (also makes it easier to match with index)
         clean_query = replace_punctuations(user).split()
-
+        # calculate matches for each term
         for term in clean_query:
-            scores = calculate_tf_idf(term, index, scores)
-
+            scores = calculate_tf_idf(term, index, scores, number_of_all_urls)
+        # find website with highest match (order dic desc)
         urls, scores = get_url_ordered(scores)
 
         for u, s in zip(urls, scores):      
