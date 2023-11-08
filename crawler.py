@@ -4,6 +4,11 @@ import requests
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
 
+import os, os.path
+from whoosh import index
+from whoosh.qparser import QueryParser, OrGroup
+from whoosh.fields import Schema, TEXT, KEYWORD, ID, STORED
+from whoosh.writing import AsyncWriter
 
 def replace_punctuations(text):
     """remove new lines, unbreakable spaces, multiple spaces or any non characters"""
@@ -15,12 +20,13 @@ def replace_punctuations(text):
 class Crawler(object):
   """crawl webpage for content and hrefs to other sites"""
 
-  def __init__(self,rel_ab_path, not_allow=False, print_search_url=False):
+  def __init__(self,schema, rel_ab_path, not_allow=False, print_search_url=False):
     """initialize with variables other than iterable through Pool"""
     self.index = {}
     self.rel_ab_path = rel_ab_path
     self.not_allow = not_allow
     self.print_search_url = print_search_url
+    self.schema = schema
 
   def get_all_hrefs(self, soup, host_url):
     """scrape url for hrefs that do not lead to other sites"""
@@ -111,6 +117,15 @@ class Crawler(object):
             self.index[term] = self.index[term] + [(url, list_of_terms.count(term) / sum_f_td)]
         else:
             self.index[term] = [(url, list_of_terms.count(term) / sum_f_td)]
+    
+  def content_to_index(self, text, url):
+    ix = index.open_dir("indexdir")#.writer()
+    writer = AsyncWriter(ix)
+    writer.add_document(
+                    url=url,
+                    content=text
+                    )
+    writer.commit()
 
   def __call__(self, search_url):
     """apply all other functions by requesting page, looking through content and retrieving information"""
@@ -126,7 +141,9 @@ class Crawler(object):
     soup = BeautifulSoup(response.content, "html.parser")
     text = self.scrape_all_text(soup)
     text = self.replace_punctuations(text)
-    self.tf_into_index(text, search_url)
+    
+    #self.tf_into_index(text, search_url)
+    self.content_to_index(text, search_url)
 
     list_of_hrefs = self.get_all_hrefs(soup, host_url)
 
@@ -226,6 +243,22 @@ if __name__ == '__main__':
     # boolean to allow switched to other webpages
     # some index to remember connection, to draw graph of connections in the end (overkill but would be cool)
     # use 'auto-complete' by looking wheter term in query is in index (overkill but would be cool)
+    
+    # create index shema
+    schema = Schema( 
+                url=ID(stored=True), 
+                content=TEXT(stored=True)
+                )
+    
+    # create dir for index
+    if not os.path.exists("indexdir"):
+        os.mkdir("indexdir")    
+        ix = index.create_in("indexdir", schema)
+    else:
+        os.system("rm -rf indexdir")
+        os.mkdir("indexdir")    
+        ix = index.create_in("indexdir", schema)
+
 
     start_url = "https://vm009.rz.uos.de/crawl"
     relative_absolute_path = '/crawl'
@@ -245,7 +278,7 @@ if __name__ == '__main__':
     merge_worker = 4
 
     search_list = [start_url]
-    index = {}
+    false_index = {}
     already_visisted = []
 
     itere = 1
@@ -256,13 +289,15 @@ if __name__ == '__main__':
 
             # using multiple threads for crawling the webpage
             with Pool(crawler_worker) as p:
-                aggregator = p.map(Crawler(relative_absolute_path, not_allow, print_search_url), search_list)
+                aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url), search_list)
             
             # need to accumulate all the information from crawling 
             list_of_hrefs = [agg[0] for agg in aggregator]
             all_hrefs = [url for url_list in list_of_hrefs for url in url_list]
             already_visisted = already_visisted + [agg[2] for agg in aggregator]
             search_list =  list( set(all_hrefs) - set(already_visisted))
+            
+            '''
             list_of_indeces = [agg[1] for agg in aggregator]
 
             # if odd number of indeces returned, we make even by removing last one
@@ -281,7 +316,8 @@ if __name__ == '__main__':
             # circumvent special case when crawling resulted in no content being found
             if list_of_indeces[0] != {}:
                 index = merge_dics(index, list_of_indeces[0])
-            
+            '''
+
             print('len(search_list) :' ,len(search_list))
             print('len(already_visisted)' ,len(already_visisted))
             print("\n")
@@ -308,12 +344,25 @@ if __name__ == '__main__':
         print("please query me :")
         user = input()
         # clean up query (also makes it easier to match with index)
-        clean_query = replace_punctuations(user).split()
+        clean_query = replace_punctuations(user)#.split()
         # calculate matches for each term
+
+        ix = index.open_dir("indexdir")
+        with ix.searcher() as searcher:
+            query = QueryParser("content", ix.schema, group=OrGroup.factory(0.9)).parse(clean_query)
+            results = searcher.search(query, limit=None)
+        
+            print("hits: ", len(results))
+
+            for hit in results:
+                print(hit["url"], hit.score)
+
+        '''
         for term in clean_query:
             scores = calculate_tf_idf(term, index, scores, number_of_all_urls)
         # find website with highest match (order dic desc)
         urls, scores = get_url_ordered(scores)
 
         for u, s in zip(urls, scores):      
-            print(u, "           ", s)    
+            print(u, "           ", s) 
+        '''   
