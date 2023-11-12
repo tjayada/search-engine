@@ -1,14 +1,13 @@
 import re
-import math
+import time
 import requests
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
-
 import os, os.path
 from whoosh import index
-from whoosh.qparser import QueryParser, OrGroup
-from whoosh.fields import Schema, TEXT, KEYWORD, ID, STORED
+from whoosh.fields import Schema, TEXT, ID
 from whoosh.writing import AsyncWriter
+
 
 def replace_punctuations(text):
     """remove new lines, unbreakable spaces, multiple spaces or any non characters"""
@@ -19,10 +18,8 @@ def replace_punctuations(text):
 
 class Crawler(object):
   """crawl webpage for content and hrefs to other sites"""
-
-  def __init__(self,schema, rel_ab_path, not_allow=False, print_search_url=False):
+  def __init__(self, schema, rel_ab_path, not_allow=False, print_search_url=False):
     """initialize with variables other than iterable through Pool"""
-    self.index = {}
     self.rel_ab_path = rel_ab_path
     self.not_allow = not_allow
     self.print_search_url = print_search_url
@@ -74,7 +71,6 @@ class Crawler(object):
         for f in self.not_allow:
             if re.search(f'({f})', found_url, re.IGNORECASE):
                 return False
-        
     return (not found_url[0] == '#' 
             and not re.search(r'(.pdf)', found_url, re.IGNORECASE)
             and not re.search(r'(.doc)', found_url, re.IGNORECASE) 
@@ -90,36 +86,25 @@ class Crawler(object):
             and not re.search(r'(mailto:)', found_url, re.IGNORECASE)
             and not re.search(r'(javascript:)', found_url, re.IGNORECASE)
             )
+  
   def safe_connection(self, search_url):
     """in case the connection is broken, timed out or other things happen"""
     tries = 1
+    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
     while tries < 3:
         try:
-            response = requests.get(search_url)
+            response = requests.get(search_url, headers=headers)
             if response.status_code != 200:
                 raise TypeError
-            return response
+            return True, response
         except:
+            time.sleep(tries)
             tries += 1
-    return False
+    return False, response.status_code
   
-  def tf_into_index(self, text, url):
-    """calculate term-frequency for each term in page content"""
-    # split text into list
-    list_of_terms = text.split()
-    # get length of list --> sum_f_td
-    sum_f_td = len(list_of_terms)  
-    # create new list.copy as set then back to list --> get uniques
-    unique_terms = list(set(list_of_terms))
-    
-    for term in unique_terms:
-        if term in self.index:
-            self.index[term] = self.index[term] + [(url, list_of_terms.count(term) / sum_f_td)]
-        else:
-            self.index[term] = [(url, list_of_terms.count(term) / sum_f_td)]
-    
   def content_to_index(self, text, url):
-    ix = index.open_dir("indexdir")#.writer()
+    """write scraped content into index"""
+    ix = index.open_dir("indexdir")
     writer = AsyncWriter(ix)
     writer.add_document(
                     url=url,
@@ -129,128 +114,34 @@ class Crawler(object):
 
   def __call__(self, search_url):
     """apply all other functions by requesting page, looking through content and retrieving information"""
-
-    response = self.safe_connection(search_url)
+    code, response = self.safe_connection(search_url)
     if self.print_search_url:
         print(search_url)
-    if not response:
-        print("no response huh?")
-        return [], self.index, search_url
+    if not code:
+        if self.print_search_url:
+            print(response, "no response huh?")
+        return [], search_url
     
     host_url = self.get_host_url(search_url, self.rel_ab_path)
     soup = BeautifulSoup(response.content, "html.parser")
     text = self.scrape_all_text(soup)
     text = self.replace_punctuations(text)
     
-    #self.tf_into_index(text, search_url)
     self.content_to_index(text, search_url)
-
     list_of_hrefs = self.get_all_hrefs(soup, host_url)
-
-    return list_of_hrefs, self.index, search_url
-
-
-
-def calculate_tf_idf(term, index, scores, number_of_all_urls=False):
-    """when index queried calculate term-frequency inverse-document-frequency to determine best match"""
-    if term not in index:
-        return scores
-    urls_and_tfs = index[term]
-    
-    l = len(list(index.values()))
-    if not number_of_all_urls:
-        number_of_all_urls = len(set([list(index.values())[i][j][0] for i in range(l) for j in range(len(list(index.values())[i]))]))
-    idf = math.log(number_of_all_urls / len(urls_and_tfs), 10)
-
-    list_of_url_idfs = [(tf[0], tf[1]*idf) for tf in urls_and_tfs]
-
-    for url, score in list_of_url_idfs:
-        if url not in scores:
-            scores[url] = score
-        else:
-            scores[url] = scores[url] + score
-    
-    return scores
-
-
-def merge_dics(dic_1, dic_2=False):
-    """merge two different dictionaries without information loss"""
-    if not dic_2:
-        dic_1, dic_2 = dic_1
-
-    for key, value in dic_2.items():
-        if key in dic_1:
-            dic_1[key] = list(set(dic_1[key] + value))
-        else:
-            dic_1[key] = value
-
-    return dic_1
-
-
-def get_url_ordered(urls_with_scores):
-    """return list of urls by scores descending"""
-    sorted_scores = sorted(urls_with_scores.values(), reverse=True)
-    
-    sorted_urls = []
-    
-    for score in sorted_scores:
-        for k, v in urls_with_scores.items():
-            if score == v and k not in sorted_urls:
-                sorted_urls.append(k)
-                break
-    return sorted_urls, sorted_scores
-
-
-def pair_iterable(iterable):
-    """
-    pair iterable into two's
-    inpired by 
-    https://stackoverflow.com/questions/312443/how-do-i-split-a-list-into-equally-sized-chunks/74120449#74120449
-    """
-    args = [iter(iterable)] * 2
-    return zip(*args)
+    return list_of_hrefs, search_url
 
 
 if __name__ == '__main__':
 
-    # benchmarks
-    # without multi
-    # 0.29s user 0.05s system 15% cpu 2.205 total
-    # 1 pool --> 0.68s user 0.12s system 27% cpu 2.916 total
-    # 1 pool --> 0.67s user 0.12s system 24% cpu 3.195 total
-    # with multi, e.g > 4 pool
-    # 2.27s user 0.46s system 164% cpu 1.659 total  
-    # 2.29s user 0.43s system 155% cpu 1.752 total
-
-    # to-do
-    # disallow # in url ? or for two urls for same key to have some tf ?
-    # e.g
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM5             0.0017153155656649559
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM3             0.0017153155656649559
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM6             0.0017153155656649559
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html             0.0017153155656649559
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html?draft=1             0.0017153155656649559
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM2             0.0017153155656649559
-    #https://www.uni-luebeck.de/forschung/verbundforschung/bmbf-netzwerke.html#TNM1             0.0017153155656649559
-    # or disallow ?id= or ?draft=
-    # e.g.
-    # https://www.uni-luebeck.de/studium/studiengaenge/biophysik.html             0.000923188310320098
-    # https://www.uni-luebeck.de/studium/studiengaenge/biophysik.html?draft=1             0.000923188310320098
-    # https://www.uni-luebeck.de/studium/studiengaenge/molecular-life-science.html             0.000772675528876484
-    # https://www.uni-luebeck.de/studium/studiengaenge/molecular-life-science.html?draft=1             0.000772675528876484
-    # boolean to allow /en/ ?
-    # if no result, try again later ? 
-    # boolean to allow switched to other webpages
-    # some index to remember connection, to draw graph of connections in the end (overkill but would be cool)
-    # use 'auto-complete' by looking wheter term in query is in index (overkill but would be cool)
-    
     # create index shema
     schema = Schema( 
                 url=ID(stored=True), 
                 content=TEXT(stored=True)
                 )
     
-    # create dir for index
+    # create dir for index everytime crawler is run to avoid double entries
+    # maybe there is an update function that we could use ?
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")    
         ix = index.create_in("indexdir", schema)
@@ -269,24 +160,19 @@ if __name__ == '__main__':
     #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
     #relative_absolute_path = False
 
-    not_allow = ["/en/"] # doesnt work for some reason
-    #not_allow = False
-    stop_after_crawl = False
+    #not_allow = ["/en/"] # doesnt work for some reason
+    not_allow = False
     print_search_url = True
 
-    crawler_worker = 4
-    merge_worker = 4
+    crawler_worker = 10
 
     search_list = [start_url]
-    false_index = {}
     already_visisted = []
 
     itere = 1
     try:
         while len(search_list) != 0:
             
-            print("iteration : ", itere)
-
             # using multiple threads for crawling the webpage
             with Pool(crawler_worker) as p:
                 aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url), search_list)
@@ -294,33 +180,14 @@ if __name__ == '__main__':
             # need to accumulate all the information from crawling 
             list_of_hrefs = [agg[0] for agg in aggregator]
             all_hrefs = [url for url_list in list_of_hrefs for url in url_list]
-            already_visisted = already_visisted + [agg[2] for agg in aggregator]
+            already_visisted = already_visisted + [agg[1] for agg in aggregator]
             search_list =  list( set(all_hrefs) - set(already_visisted))
             
-            '''
-            list_of_indeces = [agg[1] for agg in aggregator]
-
-            # if odd number of indeces returned, we make even by removing last one
-            if len(list_of_indeces) % 2 != 0 and len(list_of_indeces) > 1:
-                odd_one_out = list_of_indeces[-1]
-                list_of_indeces = list_of_indeces[:-1]
-                index = merge_dics(index, odd_one_out)
-            
-            # merge all indices together using mix of multiple threads and divide-and-conquer
-            while len(list_of_indeces) > 1:
-                pairs_of_indeces = pair_iterable(list_of_indeces)
-
-                with Pool(merge_worker) as p:
-                    list_of_indeces = p.map(merge_dics, pairs_of_indeces)
-            
-            # circumvent special case when crawling resulted in no content being found
-            if list_of_indeces[0] != {}:
-                index = merge_dics(index, list_of_indeces[0])
-            '''
-
-            print('len(search_list) :' ,len(search_list))
-            print('len(already_visisted)' ,len(already_visisted))
-            print("\n")
+            if print_search_url:
+                print("iteration : ", itere)
+                print('len(search_list) :' ,len(search_list))
+                print('len(already_visisted)' ,len(already_visisted))
+                print("\n")
             
             itere += 1
     
@@ -328,41 +195,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     
-    print(already_visisted)
-    print("\n")
-    print(len(already_visisted))
-    number_of_all_urls = len(already_visisted)
-    
-    # used mainly for benchmarks, usually you'd like to query as well
-    if stop_after_crawl:
-        exit()
-
-    # kinda stupid method to allow for unlimited user queries
-    while 1:
-        scores = {}
-        print("\n \n")
-        print("please query me :")
-        user = input()
-        # clean up query (also makes it easier to match with index)
-        clean_query = replace_punctuations(user)#.split()
-        # calculate matches for each term
-
-        ix = index.open_dir("indexdir")
-        with ix.searcher() as searcher:
-            query = QueryParser("content", ix.schema, group=OrGroup.factory(0.9)).parse(clean_query)
-            results = searcher.search(query, limit=None)
-        
-            print("hits: ", len(results))
-
-            for hit in results:
-                print(hit["url"], hit.score)
-
-        '''
-        for term in clean_query:
-            scores = calculate_tf_idf(term, index, scores, number_of_all_urls)
-        # find website with highest match (order dic desc)
-        urls, scores = get_url_ordered(scores)
-
-        for u, s in zip(urls, scores):      
-            print(u, "           ", s) 
-        '''   
+    if print_search_url:
+        print(already_visisted)
+        print("\n")
+        print(len(already_visisted))

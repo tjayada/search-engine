@@ -10,6 +10,14 @@
         <p><input type = 'text' name = 'query' placeholder="whatcha lookin for ?"/></p> 
         <p><input type = 'submit' value = 'start crawlin'/></p> 
      </form> 
+
+     <ul name="results">
+        {% for url, _, content in result_list %}
+            <p> <a href="{{ url }}"> {{ url }} </a> </p>
+            <p> {{ content|safe }} </p>
+            <br>
+        {% endfor %}
+    </ul>
     
 </body>
 </html>
