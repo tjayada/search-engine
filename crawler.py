@@ -38,7 +38,10 @@ class Crawler(object):
                     list_of_hrefs.append(found_url)
 
                 elif not re.search(r'(https?://)', found_url):
-                    list_of_hrefs.append(host_url + self.add_slash(found_url))   
+                    if re.search(r'(//)', found_url):
+                        list_of_hrefs.append('https:' + self.add_slash(found_url))
+                    else:
+                        list_of_hrefs.append(host_url + self.add_slash(found_url))   
         except:
             pass
     return list_of_hrefs
