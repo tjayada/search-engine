@@ -7,6 +7,7 @@ import os, os.path
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID
 from whoosh.writing import AsyncWriter
+import sys
 
 
 def replace_punctuations(text):
@@ -45,7 +46,7 @@ class Crawler(object):
   def get_host_url(self, url, relative_path=False):
     """get 'host' of whole url"""
     if re.search(r'https?://(.*)/', url):
-        return re.search(r'(https?://.*?)/', url).group(1) + (relative_path if relative_path else "")
+        return re.search(r'(https?://.*?)/', url).group(1) + (relative_path if relative_path and str(relative_path) not in url else "")
     else:
         return re.search(r'(https?://.*)', url).group(1) + (relative_path if relative_path else "")
     
@@ -159,12 +160,22 @@ if __name__ == '__main__':
 
     start_url = "https://vm009.rz.uos.de/crawl"
     relative_absolute_path = '/crawl'
-    
+
     #start_url = "https://www.uni-osnabrueck.de/startseite/"
     #start_url = "https://www.fh-kiel.de"
     #start_url = "https://www.cogscispace.de"
     #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
+    #start_url = "https://en.wikipedia.org/wiki/Knowledge_space"
     #relative_absolute_path = False
+    
+    # check if start-url is given as call argument
+    if len(sys.argv) > 2: # sys.argv[0]: script name, sys.argv[1]: "run", sys.argv[2:]: command-line arguments
+        start_url = sys.argv[2] 
+        try: 
+            relative_absolute_path = str('/' + start_url.split('/', 4)[3])
+        except Exception as e:
+            relative_absolute_path = False
+            print(e)
 
     #not_allow = ["/en/"] # doesnt work for some reason
     not_allow = False
@@ -175,6 +186,8 @@ if __name__ == '__main__':
 
     search_list = [start_url]
     already_visited = []
+    doc_count = 0
+    max_docs = 500
 
     itere = 1
     try:
@@ -182,9 +195,15 @@ if __name__ == '__main__':
         while len(search_list) != 0:
             
             # using multiple threads for crawling the webpage
+            doc_count += len(search_list)
             with Pool(crawler_worker) as p:
-                call_args = call_args = list(zip(search_list, [depth]*len(search_list)))
-                aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url, max_depth=search_depth), call_args)
+                call_args = list(zip(search_list, [depth]*len(search_list)))
+                if doc_count > max_docs:
+                    index_capacity = max(0, max_docs - (doc_count - len(search_list)))
+                    print("Limited index_capacity: Only processing ", index_capacity)
+                    aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url, max_depth=search_depth), call_args[:index_capacity])
+                else: 
+                    aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url, max_depth=search_depth), call_args)
             
             depth += 1
             
@@ -204,7 +223,7 @@ if __name__ == '__main__':
     
     # in case crawling takes to long ..
     except KeyboardInterrupt:
-        pass
+        exit
     
     if print_search_url:
         print(already_visited)

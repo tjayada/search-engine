@@ -40,7 +40,8 @@ def recrawl():
         venv_python = sys.prefix + '/bin/python'  # Assumes 'bin' for Unix-like systems, adjust for Windows
         # For Windows
         venv_python = sys.prefix + '\\Scripts\\python.exe'
-        result = subprocess.run([venv_python, 'crawler.py', 'run'], check=True, capture_output=True)
+        start_url = request.form['start_url']
+        result = subprocess.run([venv_python, 'crawler.py', 'run', start_url], check=True, capture_output=True)
         print(result.stdout.decode('utf-8'))  # Print the standard output
     except subprocess.CalledProcessError as e:
         print(e.stderr.decode('utf-8'))  # Print the error output

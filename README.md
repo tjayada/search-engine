@@ -1,9 +1,11 @@
 # simple search engine
 
-## run crawler.py to fill index (python crawler.py run)
+## run crawler.py to fill index 
+## (python crawler.py run optional_url_string)
 you may change arguments in main, such as the url, printing results, amount of threads etc.
 
-## run website.py to start server (flask --app website.py run)
+## run website.py to start server 
+## (flask --app website.py run)
 starts Flask with hompage taking user input to query index
 
 
