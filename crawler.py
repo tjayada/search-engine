@@ -46,7 +46,7 @@ class Crawler(object):
   def get_host_url(self, url, relative_path=False):
     """get 'host' of whole url"""
     if re.search(r'https?://(.*)/', url):
-        return re.search(r'(https?://.*?)/', url).group(1) + (relative_path if relative_path and str(relative_path) not in url else "")
+        return re.search(r'(https?://.*?)/', url).group(1) + (relative_path if relative_path else "")
     else:
         return re.search(r'(https?://.*)', url).group(1) + (relative_path if relative_path else "")
     
@@ -139,8 +139,8 @@ class Crawler(object):
         return list_of_hrefs, search_url
 
 
-if __name__ == '__main__':
 
+def crawl(url, relative_absolute_path):
     # create index shema
     schema = Schema( 
                 url=ID(stored=True), 
@@ -158,8 +158,8 @@ if __name__ == '__main__':
         ix = index.create_in("indexdir", schema)
 
 
-    start_url = "https://vm009.rz.uos.de/crawl"
-    relative_absolute_path = '/crawl'
+    start_url = url #"https://vm009.rz.uos.de/crawl"
+    relative_absolute_path = relative_absolute_path #'/crawl'
 
     #start_url = "https://www.uni-osnabrueck.de/startseite/"
     #start_url = "https://www.fh-kiel.de"
@@ -168,14 +168,6 @@ if __name__ == '__main__':
     #start_url = "https://en.wikipedia.org/wiki/Knowledge_space"
     #relative_absolute_path = False
     
-    # check if start-url is given as call argument
-    if len(sys.argv) > 2: # sys.argv[0]: script name, sys.argv[1]: "run", sys.argv[2:]: command-line arguments
-        start_url = sys.argv[2] 
-        try: 
-            relative_absolute_path = str('/' + start_url.split('/', 4)[3])
-        except Exception as e:
-            relative_absolute_path = False
-            print(e)
 
     #not_allow = ["/en/"] # doesnt work for some reason
     not_allow = False
@@ -229,3 +221,21 @@ if __name__ == '__main__':
         print(already_visited)
         print("\n")
         print(len(already_visited))
+
+
+if __name__ == '__main__':
+    # in case arguments have been passed
+    #args = sys.argv[1:]
+
+    # default starting url    
+    url = "https://vm009.rz.uos.de/crawl"
+
+    # in case if search url needs extra path
+    relative_absolute_path = '/crawl'
+
+    # if args passed, use these instead
+    #if len(args) == 2 and args[0] == '-url':
+    #    url = args[1]
+    #    relative_absolute_path = False
+
+    crawl(url, relative_absolute_path)
