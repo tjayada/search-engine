@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for
 from whoosh import index
 from whoosh.qparser import QueryParser, OrGroup
 from crawler import replace_punctuations
+import subprocess
+import sys
 
 app = Flask(__name__)
 
@@ -29,6 +31,21 @@ def search():
             result_list.append([hit["url"], hit.score, hit.highlights("content")])
 
     return render_template("results.html", result_list=result_list)
+
+@app.route('/reset_and_crawl', methods = ['POST', 'GET'])
+def recrawl():
+    '''recrawls given website and redirects to homeage'''
+    try:
+        # For Unix-like systems:
+        venv_python = sys.prefix + '/bin/python'  # Assumes 'bin' for Unix-like systems, adjust for Windows
+        # For Windows
+        venv_python = sys.prefix + '\\Scripts\\python.exe'
+        result = subprocess.run([venv_python, 'crawler.py', 'run'], check=True, capture_output=True)
+        print(result.stdout.decode('utf-8'))  # Print the standard output
+    except subprocess.CalledProcessError as e:
+        print(e.stderr.decode('utf-8'))  # Print the error output
+        print("current venv: ", sys.prefix + '\\Scripts\\python.exe')
+    return redirect(url_for('homepage'))
    
 if __name__ == '__main__':
     app.run(debug = True)

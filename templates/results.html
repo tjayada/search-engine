@@ -18,6 +18,11 @@
             <br>
         {% endfor %}
     </ul>
+
+    <form action="/reset_and_crawl" method="POST" class="lower-right">
+        <p><input type = 'text' name = 'start_url' placeholder="https://vm009.rz.uos.de/crawl"/></p> 
+        <p><input type="submit" value="reset and crawl again"></p> 
+    </form>
     
 </body>
 </html>

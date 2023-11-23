@@ -1,3 +1,4 @@
 .DS_Store
 search_venv/
 __pycache__/
+indexdir/

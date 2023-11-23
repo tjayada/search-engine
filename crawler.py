@@ -18,12 +18,13 @@ def replace_punctuations(text):
 
 class Crawler(object):
   """crawl webpage for content and hrefs to other sites"""
-  def __init__(self, schema, rel_ab_path, not_allow=False, print_search_url=False):
+  def __init__(self, schema, rel_ab_path, not_allow=False, print_search_url=False, max_depth=5):
     """initialize with variables other than iterable through Pool"""
     self.rel_ab_path = rel_ab_path
     self.not_allow = not_allow
     self.print_search_url = print_search_url
     self.schema = schema
+    self.max_depth = max_depth
 
   def get_all_hrefs(self, soup, host_url):
     """scrape url for hrefs that do not lead to other sites"""
@@ -112,24 +113,29 @@ class Crawler(object):
                     )
     writer.commit()
 
-  def __call__(self, search_url):
+  def __call__(self, args):
     """apply all other functions by requesting page, looking through content and retrieving information"""
-    code, response = self.safe_connection(search_url)
-    if self.print_search_url:
-        print(search_url)
-    if not code:
+    search_url, depth = args
+    
+    if depth >= self.max_depth:
+        return [], search_url # provides no more links, if max search depth exceeded
+    else:
+        code, response = self.safe_connection(search_url)
         if self.print_search_url:
-            print(response, "no response huh?")
-        return [], search_url
-    
-    host_url = self.get_host_url(search_url, self.rel_ab_path)
-    soup = BeautifulSoup(response.content, "html.parser")
-    text = self.scrape_all_text(soup)
-    text = self.replace_punctuations(text)
-    
-    self.content_to_index(text, search_url)
-    list_of_hrefs = self.get_all_hrefs(soup, host_url)
-    return list_of_hrefs, search_url
+            print(search_url)
+        if not code:
+            if self.print_search_url:
+                print(response, "no response huh?")
+            return [], search_url
+        
+        host_url = self.get_host_url(search_url, self.rel_ab_path)
+        soup = BeautifulSoup(response.content, "html.parser")
+        text = self.scrape_all_text(soup)
+        text = self.replace_punctuations(text)
+        
+        self.content_to_index(text, search_url)
+        list_of_hrefs = self.get_all_hrefs(soup, host_url)
+        return list_of_hrefs, search_url
 
 
 if __name__ == '__main__':
@@ -165,28 +171,33 @@ if __name__ == '__main__':
     print_search_url = True
 
     crawler_worker = 10
+    search_depth = 5
 
     search_list = [start_url]
-    already_visisted = []
+    already_visited = []
 
     itere = 1
     try:
+        depth = 0
         while len(search_list) != 0:
             
             # using multiple threads for crawling the webpage
             with Pool(crawler_worker) as p:
-                aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url), search_list)
+                call_args = call_args = list(zip(search_list, [depth]*len(search_list)))
+                aggregator = p.map(Crawler(schema, relative_absolute_path, not_allow, print_search_url, max_depth=search_depth), call_args)
+            
+            depth += 1
             
             # need to accumulate all the information from crawling 
             list_of_hrefs = [agg[0] for agg in aggregator]
             all_hrefs = [url for url_list in list_of_hrefs for url in url_list]
-            already_visisted = already_visisted + [agg[1] for agg in aggregator]
-            search_list =  list( set(all_hrefs) - set(already_visisted))
+            already_visited = already_visited + [agg[1] for agg in aggregator]
+            search_list =  list( set(all_hrefs) - set(already_visited))
             
             if print_search_url:
                 print("iteration : ", itere)
                 print('len(search_list) :' ,len(search_list))
-                print('len(already_visisted)' ,len(already_visisted))
+                print('len(already_visited)' ,len(already_visited))
                 print("\n")
             
             itere += 1
@@ -196,6 +207,6 @@ if __name__ == '__main__':
         pass
     
     if print_search_url:
-        print(already_visisted)
+        print(already_visited)
         print("\n")
-        print(len(already_visisted))
+        print(len(already_visited))
