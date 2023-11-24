@@ -6,12 +6,22 @@
 </head>
 <body>
 
-    <form action = "/show_results" method = "POST"> 
-        <p><input type = 'text' name = 'query' placeholder="whatcha lookin for ?"/></p> 
-        <p><input type = 'submit' value = 'start crawlin'/></p> 
-     </form> 
+    <div class="container">
+        <form action = "/show_results" method = "POST" class="top-left"> 
+            <p><input type = 'text' name = 'query' placeholder="whatcha lookin for ?"/></p> 
+            <p><input type = 'submit' value = 'search'/></p> 
+         </form> 
+         
+         <img src="{{ url_for('static', filename='spooder.png') }}" class="spide">
 
-     <ul name="results">
+         <form action="/reset_and_crawl" method="POST" class="top-right">
+            <p><input type = 'text' name = 'start_url' placeholder="https://www.cogscispace.de/"/></p> 
+            <p><input type="submit" value="crawl url"></p> 
+        </form>
+    </div>
+    
+
+     <ul name="results" class="prints">
         {% for url, _, content in result_list %}
             <p> <a href="{{ url }}"> {{ url }} </a> </p>
             <p> {{ content|safe }} </p>
@@ -19,10 +29,7 @@
         {% endfor %}
     </ul>
 
-    <form action="/reset_and_crawl" method="POST" class="lower-right">
-        <p><input type = 'text' name = 'start_url' placeholder="https://vm009.rz.uos.de/crawl"/></p> 
-        <p><input type="submit" value="reset and crawl again"></p> 
-    </form>
+    
     
 </body>
 </html>

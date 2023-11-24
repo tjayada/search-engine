@@ -31,6 +31,7 @@ def search():
     """display new searchbar and search results from previous search"""
     # get user input
     q = request.form['query']
+    
     # clean up input for easier parsing
     clean_q = replace_punctuations(q)
 
@@ -43,6 +44,9 @@ def search():
         for hit in results:
             result_list.append([hit["url"], hit.score, hit.highlights("content")])
 
+    if len(result_list) == 0:
+        return redirect(url_for('homepage'))
+    
     return render_template("results.html", result_list=result_list)
 
 @app.route('/reset_and_crawl', methods = ['POST', 'GET'])
@@ -53,11 +57,16 @@ def recrawl():
     
     # check user input 
     print(url)
+
+    if url == "":
+        crawl("https://www.cogscispace.de")
+        return redirect(url_for('homepage'))
+
     if not check_url(url):
         print("bad url")
         return redirect(url_for('homepage'))
     
-    crawl(url, False)
+    crawl(url)
     return redirect(url_for('homepage'))
    
 if __name__ == '__main__':

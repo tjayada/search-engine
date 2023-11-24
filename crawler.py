@@ -17,6 +17,20 @@ def replace_punctuations(text):
     return re.sub(r'\s[\s]+', '', text).strip()
 
 
+def get_host_url_and_added_path(url):
+    """get 'host' of whole url"""
+    if re.search(r'https?://(.*)/', url):
+        try:
+            re.search(r'(https?://.*)/(.*)', url).group(1)
+            return re.search(r'(https?://.*?)/', url).group(1), re.search(r'(https?://.*?)/(.*)', url).group(2)
+
+        except:
+            return re.search(r'(https?://.*)/', url).group(1), ""
+
+    else:
+        return re.search(r'(https?://.*)', url).group(1), ""
+
+
 class Crawler(object):
   """crawl webpage for content and hrefs to other sites"""
   def __init__(self, schema, rel_ab_path, not_allow=False, print_search_url=False, max_depth=5):
@@ -111,7 +125,7 @@ class Crawler(object):
     """write scraped content into index"""
     ix = index.open_dir("indexdir")
     writer = AsyncWriter(ix)
-    writer.add_document(
+    writer.update_document(
                     url=url,
                     content=text
                     )
@@ -143,33 +157,43 @@ class Crawler(object):
 
 
 
-def crawl(url, relative_absolute_path):
+def crawl(start_url):
     # create index shema
     schema = Schema( 
-                url=ID(stored=True), 
+                url=ID(unique=True, stored=True), 
                 content=TEXT(stored=True)
                 )
     
     # create dir for index everytime crawler is run to avoid double entries
     # maybe there is an update function that we could use ?
+    
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")    
         ix = index.create_in("indexdir", schema)
+    '''
     else:
         os.system("rm -rf indexdir")
         os.mkdir("indexdir")    
         ix = index.create_in("indexdir", schema)
+    '''
 
 
-    start_url = url #"https://vm009.rz.uos.de/crawl"
-    relative_absolute_path = relative_absolute_path #'/crawl'
+    _, rel_ab_path = get_host_url_and_added_path(start_url)
+
+    if rel_ab_path == "":
+        rel_ab_path = False
+    else:
+        rel_ab_path = '/' + rel_ab_path
+
+    #start_url = url #"https://vm009.rz.uos.de/crawl"
+    #relative_absolute_path = relative_absolute_path #'/crawl'
 
     #start_url = "https://www.uni-osnabrueck.de/startseite/"
     #start_url = "https://www.fh-kiel.de"
     #start_url = "https://www.cogscispace.de"
     #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
     #start_url = "https://en.wikipedia.org/wiki/Knowledge_space"
-    #relative_absolute_path = False
+    relative_absolute_path = rel_ab_path
     
 
     #not_allow = ["/en/"] # doesnt work for some reason
@@ -226,19 +250,21 @@ def crawl(url, relative_absolute_path):
         print(len(already_visited))
 
 
+
 if __name__ == '__main__':
     # in case arguments have been passed
     #args = sys.argv[1:]
 
     # default starting url    
-    url = "https://vm009.rz.uos.de/crawl"
-
+    start_url = "https://vm009.rz.uos.de/crawl"
+    #h_url = "https://whoosh.readthedocs.io"
     # in case if search url needs extra path
-    relative_absolute_path = '/crawl'
+    #relative_absolute_path = '/crawl'
 
+    
     # if args passed, use these instead
     #if len(args) == 2 and args[0] == '-url':
     #    url = args[1]
     #    relative_absolute_path = False
 
-    crawl(url, relative_absolute_path)
+    crawl(start_url)
