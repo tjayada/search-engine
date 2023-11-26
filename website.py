@@ -98,14 +98,14 @@ def recrawl():
     print(url)
 
     if url == "":
-        crawl("https://www.cogscispace.de")
+        crawl("https://www.cogscispace.de", relative_absolute_path=False)
         return redirect(url_for('homepage'))
 
     if not check_url(url):
         print("bad url")
         return redirect(url_for('homepage'))
     
-    crawl(url)
+    crawl(url, relative_absolute_path=True)
     return redirect(url_for('homepage'))
    
 if __name__ == '__main__':

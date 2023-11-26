@@ -2,7 +2,7 @@ import re
 import time
 import requests
 from bs4 import BeautifulSoup
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool
 import os, os.path
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID
