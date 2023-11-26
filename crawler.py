@@ -2,7 +2,7 @@ import re
 import time
 import requests
 from bs4 import BeautifulSoup
-from multiprocessing.dummy import Pool
+from multiprocessing import Pool
 import os, os.path
 from whoosh import index
 from whoosh.fields import Schema, TEXT, ID
@@ -254,10 +254,10 @@ def crawl(start_url, relative_absolute_path=False):
 
 if __name__ == '__main__':
     # in case arguments have been passed
-    #args = sys.argv[1:]
+    args = sys.argv[1:]
 
     # default starting url    
-    #start_url = "https://vm009.rz.uos.de/crawl"
+    url = "https://vm009.rz.uos.de/crawl"
     #start_url = "https://whoosh.readthedocs.io/en/latest/"
     # in case if search url needs extra path
     #relative_absolute_path = '/crawl'
@@ -267,11 +267,17 @@ if __name__ == '__main__':
 
     #start_url = "https://www.cogscispace.de"
 
-    start_url = "https://www.fh-kiel.de"
+    #url = "https://www.fh-kiel.de"
+    relative_absolute_path = False
 
     # if args passed, use these instead
-    #if len(args) == 2 and args[0] == '-url':
-    #    url = args[1]
-    #    relative_absolute_path = False
+    if len(args) == 2 and args[0] == '-url':
+        url = args[1]
+        relative_absolute_path = False
+    
+    if len(args) == 4 and args[0] == '-url' and args[2] == '-path':
+        url = args[1]
+        relative_absolute_path = args[3]
+    
 
-    crawl(start_url, relative_absolute_path=False)
+    crawl(start_url=url, relative_absolute_path=relative_absolute_path)

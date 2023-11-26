@@ -4,6 +4,8 @@ from whoosh.qparser import QueryParser, OrGroup
 from crawler import replace_punctuations, crawl
 import requests
 import math
+import os
+import subprocess
 
 def check_url(search_url):
     """check user input url"""
@@ -98,14 +100,21 @@ def recrawl():
     print(url)
 
     if url == "":
-        crawl("https://www.cogscispace.de", relative_absolute_path=False)
-        return redirect(url_for('homepage'))
-
+        url = "https://www.cogscispace.de"
+        
     if not check_url(url):
         print("bad url")
         return redirect(url_for('homepage'))
     
-    crawl(url, relative_absolute_path=True)
+
+    python_version = os.popen("which python").read().replace("\n", "")
+
+    
+        #crawl("https://www.cogscispace.de", relative_absolute_path=False)
+    
+    #crawl(url, relative_absolute_path=True)
+    print(os.path.abspath(os.getcwd()))
+    subprocess.run([python_version, "crawler.py", "-url", url, "-path", "True"])
     return redirect(url_for('homepage'))
    
 if __name__ == '__main__':
