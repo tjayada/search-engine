@@ -9,14 +9,14 @@
 <body>
 
      <div class="container">
-        <form action = "/show_results" method = "POST" class="top-left"> 
+        <form action = "./show_results" method = "POST" class="top-left"> 
             <p><input type = 'text' name = 'query' placeholder="whatcha lookin for ?"/></p> 
             <p><input type = 'submit' value = 'search'/></p> 
          </form> 
          
          <img src="{{ url_for('static', filename='spooder.png') }}" class="spide">
 
-         <form action="/reset_and_crawl" method="POST" class="top-right">
+         <form action="./reset_and_crawl" method="POST" class="top-right">
             <p><input type = 'text' name = 'start_url' placeholder="https://www.cogscispace.de/"/></p> 
             <p><input type="submit" value="crawl url"></p> 
         </form>

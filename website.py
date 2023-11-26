@@ -26,6 +26,12 @@ def homepage():
     return render_template("start.html")
 
 
+import traceback
+@app.errorhandler(500)
+def internal_error(exception):
+   return "<pre>"+traceback.format_exc()+"</pre>"
+
+
 @app.route('/show_results', methods = ['POST', 'GET']) 
 def search():
     """display new searchbar and search results from previous search"""
