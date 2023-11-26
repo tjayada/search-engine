@@ -17,18 +17,14 @@ def replace_punctuations(text):
     return re.sub(r'\s[\s]+', '', text).strip()
 
 
-def get_host_url_and_added_path(url):
-    """get 'host' of whole url"""
+def get_extra_path(url):
+    """get path on top of 'host' url"""
     if re.search(r'https?://(.*)/', url):
         try:
-            re.search(r'(https?://.*)/(.*)', url).group(1)
-            return re.search(r'(https?://.*?)/', url).group(1), re.search(r'(https?://.*?)/(.*)', url).group(2)
+            return re.search(r'(https?://.*?)/(.*)', url).group(2) if re.search(r'(https?://.*?)/(.*)', url).group(2)[-1] != "/" else re.search(r'(https?://.*?)/(.*)', url).group(2)[:-1]
 
         except:
-            return re.search(r'(https?://.*)/', url).group(1), ""
-
-    else:
-        return re.search(r'(https?://.*)', url).group(1), ""
+            return False
 
 
 class Crawler(object):
@@ -41,7 +37,7 @@ class Crawler(object):
     self.schema = schema
     self.max_depth = max_depth
 
-  def get_all_hrefs(self, soup, host_url):
+  def get_all_hrefs(self, soup, host_url, rel_ab_path):
     """scrape url for hrefs that do not lead to other sites"""
     list_of_hrefs = []
     for url in soup.find_all('a'):
@@ -54,18 +50,25 @@ class Crawler(object):
                 elif not re.search(r'(https?://)', found_url):
                     if re.search(r'(//)', found_url):
                         list_of_hrefs.append('https:' + self.add_slash(found_url))
+
+                    elif rel_ab_path and (host_url + self.add_slash(rel_ab_path) in host_url + self.add_slash(found_url)):
+                        list_of_hrefs.append(host_url + self.add_slash(rel_ab_path))
+                    
+                    elif rel_ab_path:
+                        list_of_hrefs.append(host_url + self.add_slash(rel_ab_path) + self.add_slash(found_url))
+                    
                     else:
-                        list_of_hrefs.append(host_url + self.add_slash(found_url))   
+                        list_of_hrefs.append(host_url + self.add_slash(found_url)) 
         except:
             pass
     return list_of_hrefs
   
-  def get_host_url(self, url, relative_path=False):
+  def get_host_url(self, url):
     """get 'host' of whole url"""
     if re.search(r'https?://(.*)/', url):
-        return re.search(r'(https?://.*?)/', url).group(1) + (relative_path if relative_path else "")
+        return re.search(r'(https?://.*?)/', url).group(1)
     else:
-        return re.search(r'(https?://.*)', url).group(1) + (relative_path if relative_path else "")
+        return re.search(r'(https?://.*)', url).group(1)
     
   def scrape_all_text(self, soup):
     """get all visible text from url"""
@@ -90,7 +93,8 @@ class Crawler(object):
         for f in self.not_allow:
             if re.search(f'({f})', found_url, re.IGNORECASE):
                 return False
-    return (not found_url[0] == '#' 
+    return (
+            '#' not in  found_url
             and not re.search(r'(.pdf)', found_url, re.IGNORECASE)
             and not re.search(r'(.doc)', found_url, re.IGNORECASE) 
             and not re.search(r'(.xml)', found_url, re.IGNORECASE)
@@ -146,18 +150,18 @@ class Crawler(object):
                 print(response, "no response huh?")
             return [], search_url
         
-        host_url = self.get_host_url(search_url, self.rel_ab_path)
+        host_url = self.get_host_url(search_url)
         soup = BeautifulSoup(response.content, "html.parser")
         text = self.scrape_all_text(soup)
         text = self.replace_punctuations(text)
         
         self.content_to_index(text, search_url)
-        list_of_hrefs = self.get_all_hrefs(soup, host_url)
+        list_of_hrefs = self.get_all_hrefs(soup, host_url, self.rel_ab_path)
         return list_of_hrefs, search_url
 
 
 
-def crawl(start_url):
+def crawl(start_url, relative_absolute_path=False):
     # create index shema
     schema = Schema( 
                 url=ID(unique=True, stored=True), 
@@ -178,12 +182,9 @@ def crawl(start_url):
     '''
 
 
-    _, rel_ab_path = get_host_url_and_added_path(start_url)
-
-    if rel_ab_path == "":
-        rel_ab_path = False
-    else:
-        rel_ab_path = '/' + rel_ab_path
+    if relative_absolute_path:
+        relative_absolute_path = get_extra_path(start_url)
+    
 
     #start_url = url #"https://vm009.rz.uos.de/crawl"
     #relative_absolute_path = relative_absolute_path #'/crawl'
@@ -193,7 +194,7 @@ def crawl(start_url):
     #start_url = "https://www.cogscispace.de"
     #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
     #start_url = "https://en.wikipedia.org/wiki/Knowledge_space"
-    relative_absolute_path = rel_ab_path
+    #relative_absolute_path = rel_ab_path
     
 
     #not_allow = ["/en/"] # doesnt work for some reason
@@ -256,15 +257,21 @@ if __name__ == '__main__':
     #args = sys.argv[1:]
 
     # default starting url    
-    start_url = "https://vm009.rz.uos.de/crawl"
-    #h_url = "https://whoosh.readthedocs.io"
+    #start_url = "https://vm009.rz.uos.de/crawl"
+    #start_url = "https://whoosh.readthedocs.io/en/latest/"
     # in case if search url needs extra path
     #relative_absolute_path = '/crawl'
+    #start_url = "https://www.uni-osnabrueck.de/False/"
 
-    
+    #start_url = "https://www.wikipedia.org"
+
+    #start_url = "https://www.cogscispace.de"
+
+    start_url = "https://www.fh-kiel.de"
+
     # if args passed, use these instead
     #if len(args) == 2 and args[0] == '-url':
     #    url = args[1]
     #    relative_absolute_path = False
 
-    crawl(start_url)
+    crawl(start_url, relative_absolute_path=False)

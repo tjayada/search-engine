@@ -12,14 +12,22 @@
         <form action = "./show_results" method = "POST" class="top-left"> 
             <p><input type = 'text' name = 'query' placeholder="whatcha lookin for ?"/></p> 
             <p><input type = 'submit' value = 'search'/></p> 
+            <input type = 'hidden' name = 'choice'/>
+            <input type = 'hidden' name = 'page' value="1"/>
          </form> 
          
-         <img src="{{ url_for('static', filename='spooder.png') }}" class="spide">
+         <form action = "./show_results" method = "POST"> 
+            <input type="image" src="{{ url_for('static', filename='spooder.png') }}" class="spide">
+            <input type = 'hidden' name = 'query'/>
+            <input type = 'hidden' name = 'choice'/>
+            <input type = 'hidden' name = 'page' value="1"/>
+         </form>
 
          <form action="./reset_and_crawl" method="POST" class="top-right">
             <p><input type = 'text' name = 'start_url' placeholder="https://www.cogscispace.de/"/></p> 
             <p><input type="submit" value="crawl url"></p> 
         </form>
+
     </div>
 
 </body>
