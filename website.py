@@ -73,9 +73,9 @@ def search():
     result_list = result_list[(p - 1) * results_per_page : (p) * results_per_page]
 
     # either choose 'logo' randomly or not
-    spider = "/static/spooder.png"
+    spider = "./static/spooder.png"
     if random_spider:
-        spider = f"/static/spooder_{random.randint(1, 3)}.png"
+        spider = f"./static/spooder_{random.randint(1, 3)}.png"
     
     return render_template("results.html", result_list=result_list, user_query=q, page_number=p, spider=spider)
 
