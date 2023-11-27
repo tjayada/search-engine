@@ -1,18 +1,55 @@
 # simple search engine
 
-## run crawler.py to fill index 
-## (python crawler.py run optional_url_string)
-you may change arguments in main, such as the url, printing results, amount of threads etc.
 
-## run website.py to start server 
-## (flask --app website.py run)
-starts Flask with hompage taking user input to query index
+this is a simple search engine created in python using multiprocessing to *crawl* the *web*, then save the information using <a href="https://whoosh.readthedocs.io/en/latest/">whoosh</a> and lastly building a website using <a href="https://flask.palletsprojects.com/en/3.0.x/">flask</a> to then query the index
+
+## How-To 
+1. create and activate a virtual environment <br>
+2. install all dependencies in requirements.txt
+3. build index using the crawler and whoosh
+	* either change code in main and use the crawler directly
+
+			python crawler.py 
+	* or use arguments like
+
+			python crawler.py -url test.com
+			
+	* or use fill\_index.py which loops over all given urls in search\_url.txt
+	
+			python fill_index.py
+			
+4. start web application
+	* either start manually
+	
+			python website.py
+	
+	* or make use of website.wsgi
+	
 
 
-# to-do
-1. add css to make site fancy, e.g spider theme since we are *crawling* the *web* or something similarily stupid and fun, or make it look professional idk
-2. add functions to site, eg. display (dump) all index entries, take user input url to crawl that etc. sky is the limit 
-3. make scraping better: function scrape\_all\_text in crawler class currently takes ALL visible content, maybe reduce to only paragraphs or something like that
-4. make index able to update: currently if same page gets crawled, 2 separate index entries would be created, current solution is to delete old index in main before crawling
-5. fix crawlers KeyboadrInterrupt: does not work for pool of crawlers 
-6. OS specifics: automatically recognice OS in recrawl() in website.py
+## crawler.py
+this file contains a crawler class, which is then used in the crawl function <br>
+there are many arguments inside the function such as <br>
+
+1. number of processes
+2. search depth
+3. allowed number of urls in single crawl
+4. printing visited urls
+5. ...
+6. and the quite confusing "relative\_absolute\_path", which indicates whether the 'host url' should be extended, e.g. https://whoosh.readthedocs.io/en/latest/ needs the '/en/latest' , otherwise found urls are wrongly assembled
+
+## website.py
+this file contains a few html pages which get rendered using flask <br>
+
+### a few screenshots
+
+The webpage after the user searched for "ai" : 
+<br>
+<br>
+<img src="images_for_readme/results_for_ai.png" >
+<br>
+
+The webpage after the user wanted to crawl an url, but the feature was turned off : 
+<br>
+<img src="images_for_readme/404.png" >
+<br>

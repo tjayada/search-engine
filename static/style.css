@@ -14,7 +14,6 @@ input[type=submit] {
 
 /* the whole html body */
 body {
-    /* background-image: url("http://images6.fanpop.com/image/photos/33200000/Spongebob-spongebob-squarepants-33210754-3644-2445.jpg"); */
     background-color: #ffffff;
     height: 500px;
     background-position: center;
@@ -22,21 +21,12 @@ body {
     background-size: cover;
 }
 
-
-.lower-middle {
-    position: absolute;
-    left: 33%;
-    right: 33%;
-    bottom: 10px;
-    padding: 10px;
-    background-color: #ccc;
-    border: 1px solid #f0f0f0;
-}
-
+/* container for the search bars, buttons and logo */
 .container {
     position: relative;
 }
 
+/* container to print the results into */
 .prints {
     position: relative;
     top:  160px;
@@ -45,6 +35,7 @@ body {
     border: 1px solid #f0f0f0;
 }
 
+/* container for form (search bar, button) in top left corner */
 .top-left {
     position: absolute;
     top:  10px;
@@ -54,6 +45,7 @@ body {
     border: 1px solid #f0f0f0;
 }
 
+/* container for form (search bar, button) in top right corner */
 .top-right {
     position: absolute;
     top:  10px;
@@ -63,16 +55,16 @@ body {
     border: 1px solid #f0f0f0;
 }
 
-
+/* the spider logo in the top middle */
 .spide {
     position: absolute;
     height: 120px;
     width: 120px;
-
     top: 8px;
     left: 45%;
 }
 
+/* the logo in bigger with dont for sort of 404 */
 .sorry_spide {
     position: absolute;
     height: 240px;
@@ -81,12 +73,14 @@ body {
     top: 20%;
 }
 
+/* the explanaiton in the sort of 404 */
 .sorry_explained {
     position: absolute;
     left: 30%;
     top: 60%;
 }
 
+/* holds the previous and next buttons */
 .lower-container {
     position: relative;
     top:  160px;
@@ -99,6 +93,7 @@ body {
     border: 1px solid #f0f0f0;
 }
 
+/* the previous button */
 .lower-left {
     position: absolute;
     bottom: 10px;
@@ -106,6 +101,7 @@ body {
     
 }
 
+/* the next button */
 .lower-right {
     position: absolute;
     bottom: 10px;

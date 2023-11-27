@@ -163,6 +163,7 @@ class Crawler(object):
 
 
 def crawl(start_url, relative_absolute_path=False):
+    """use multiprocessing to create multiple crawlers and crawl given url"""
     # create index shema
     schema = Schema( 
                 url=ID(unique=True, stored=True), 
@@ -175,38 +176,27 @@ def crawl(start_url, relative_absolute_path=False):
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")    
         ix = index.create_in("indexdir", schema)
-    '''
-    else:
-        os.system("rm -rf indexdir")
-        os.mkdir("indexdir")    
-        ix = index.create_in("indexdir", schema)
-    '''
-
 
     if relative_absolute_path:
         relative_absolute_path = get_extra_path(start_url)
     
 
-    #start_url = url #"https://vm009.rz.uos.de/crawl"
-    #relative_absolute_path = relative_absolute_path #'/crawl'
+    # below some arguments that can be adjusted accordingly
 
-    #start_url = "https://www.uni-osnabrueck.de/startseite/"
-    #start_url = "https://www.fh-kiel.de"
-    #start_url = "https://www.cogscispace.de"
-    #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
-    #start_url = "https://en.wikipedia.org/wiki/Knowledge_space"
-    #relative_absolute_path = rel_ab_path
-    
-
-    #not_allow = ["/en/"] # doesnt work for some reason
+    # do not allow certain urls based on the strings inside the list
+    #not_allow = ["/en/"] 
     not_allow = False
+    # whether to print each url that is visited or not
     print_search_url = True
-
+    # how many processes should be used 
     crawler_worker = 10
+    # how deep should be searched
     search_depth = 5
-
+    # pretty much obsolete because of fill_index.py 
     search_list = [start_url]
+    # the list containing all visited urls (also the ones with status!=200 etc.)
     already_visited = []
+    # how many urls should be searched in one crawl 
     doc_count = 0
     max_docs = 500
 
@@ -257,17 +247,8 @@ if __name__ == '__main__':
     # in case arguments have been passed
     args = sys.argv[1:]
 
-    # default starting url    
-    #url = "https://vm009.rz.uos.de/crawl"
-    #url = "https://whoosh.readthedocs.io/en/latest/"
-    # in case if search url needs extra path
-    #relative_absolute_path = '/crawl'
-    #start_url = "https://www.uni-osnabrueck.de/False/"
-
-    #start_url = "https://www.wikipedia.org"
-
-    url = "https://www.cogscispace.de"
-    #url = "https://www.fh-kiel.de"
+    # default values if nothing is passed to main    
+    url = "https://vm009.rz.uos.de/crawl"
     relative_absolute_path = True
 
     # if args passed, use these instead
@@ -278,6 +259,5 @@ if __name__ == '__main__':
     if len(args) == 4 and args[0] == '-url' and args[2] == '-path':
         url = args[1]
         relative_absolute_path = args[3]
-    
 
     crawl(start_url=url, relative_absolute_path=relative_absolute_path)
