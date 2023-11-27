@@ -17,18 +17,14 @@ def replace_punctuations(text):
     return re.sub(r'\s[\s]+', '', text).strip()
 
 
-def get_host_url_and_added_path(url):
-    """get 'host' of whole url"""
+def get_extra_path(url):
+    """get path on top of 'host' url"""
     if re.search(r'https?://(.*)/', url):
         try:
-            re.search(r'(https?://.*)/(.*)', url).group(1)
-            return re.search(r'(https?://.*?)/', url).group(1), re.search(r'(https?://.*?)/(.*)', url).group(2)
+            return re.search(r'(https?://.*?)/(.*)', url).group(2) if re.search(r'(https?://.*?)/(.*)', url).group(2)[-1] != "/" else re.search(r'(https?://.*?)/(.*)', url).group(2)[:-1]
 
         except:
-            return re.search(r'(https?://.*)/', url).group(1), ""
-
-    else:
-        return re.search(r'(https?://.*)', url).group(1), ""
+            return False
 
 
 class Crawler(object):
@@ -41,7 +37,7 @@ class Crawler(object):
     self.schema = schema
     self.max_depth = max_depth
 
-  def get_all_hrefs(self, soup, host_url):
+  def get_all_hrefs(self, soup, host_url, rel_ab_path):
     """scrape url for hrefs that do not lead to other sites"""
     list_of_hrefs = []
     for url in soup.find_all('a'):
@@ -54,18 +50,25 @@ class Crawler(object):
                 elif not re.search(r'(https?://)', found_url):
                     if re.search(r'(//)', found_url):
                         list_of_hrefs.append('https:' + self.add_slash(found_url))
+
+                    elif rel_ab_path and (host_url + self.add_slash(rel_ab_path) in host_url + self.add_slash(found_url)):
+                        list_of_hrefs.append(host_url + self.add_slash(rel_ab_path))
+                    
+                    elif rel_ab_path:
+                        list_of_hrefs.append(host_url + self.add_slash(rel_ab_path) + self.add_slash(found_url))
+                    
                     else:
-                        list_of_hrefs.append(host_url + self.add_slash(found_url))   
+                        list_of_hrefs.append(host_url + self.add_slash(found_url)) 
         except:
             pass
     return list_of_hrefs
   
-  def get_host_url(self, url, relative_path=False):
+  def get_host_url(self, url):
     """get 'host' of whole url"""
     if re.search(r'https?://(.*)/', url):
-        return re.search(r'(https?://.*?)/', url).group(1) + (relative_path if relative_path else "")
+        return re.search(r'(https?://.*?)/', url).group(1)
     else:
-        return re.search(r'(https?://.*)', url).group(1) + (relative_path if relative_path else "")
+        return re.search(r'(https?://.*)', url).group(1)
     
   def scrape_all_text(self, soup):
     """get all visible text from url"""
@@ -90,7 +93,9 @@ class Crawler(object):
         for f in self.not_allow:
             if re.search(f'({f})', found_url, re.IGNORECASE):
                 return False
-    return (not found_url[0] == '#' 
+    return (
+            '#' not in  found_url
+            and '..' not in found_url
             and not re.search(r'(.pdf)', found_url, re.IGNORECASE)
             and not re.search(r'(.doc)', found_url, re.IGNORECASE) 
             and not re.search(r'(.xml)', found_url, re.IGNORECASE)
@@ -112,14 +117,14 @@ class Crawler(object):
     headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
     while tries < 3:
         try:
-            response = requests.get(search_url, headers=headers)
+            response = requests.get(search_url, headers=headers, timeout=3)
             if response.status_code != 200:
                 raise TypeError
             return True, response
         except:
             time.sleep(tries)
             tries += 1
-    return False, response.status_code
+    return False, False
   
   def content_to_index(self, text, url):
     """write scraped content into index"""
@@ -143,21 +148,22 @@ class Crawler(object):
             print(search_url)
         if not code:
             if self.print_search_url:
-                print(response, "no response huh?")
+                print("no response huh?")
             return [], search_url
         
-        host_url = self.get_host_url(search_url, self.rel_ab_path)
+        host_url = self.get_host_url(search_url)
         soup = BeautifulSoup(response.content, "html.parser")
         text = self.scrape_all_text(soup)
         text = self.replace_punctuations(text)
         
         self.content_to_index(text, search_url)
-        list_of_hrefs = self.get_all_hrefs(soup, host_url)
+        list_of_hrefs = self.get_all_hrefs(soup, host_url, self.rel_ab_path)
         return list_of_hrefs, search_url
 
 
 
-def crawl(start_url):
+def crawl(start_url, relative_absolute_path=False):
+    """use multiprocessing to create multiple crawlers and crawl given url"""
     # create index shema
     schema = Schema( 
                 url=ID(unique=True, stored=True), 
@@ -170,41 +176,27 @@ def crawl(start_url):
     if not os.path.exists("indexdir"):
         os.mkdir("indexdir")    
         ix = index.create_in("indexdir", schema)
-    '''
-    else:
-        os.system("rm -rf indexdir")
-        os.mkdir("indexdir")    
-        ix = index.create_in("indexdir", schema)
-    '''
 
-
-    _, rel_ab_path = get_host_url_and_added_path(start_url)
-
-    if rel_ab_path == "":
-        rel_ab_path = False
-    else:
-        rel_ab_path = '/' + rel_ab_path
-
-    #start_url = url #"https://vm009.rz.uos.de/crawl"
-    #relative_absolute_path = relative_absolute_path #'/crawl'
-
-    #start_url = "https://www.uni-osnabrueck.de/startseite/"
-    #start_url = "https://www.fh-kiel.de"
-    #start_url = "https://www.cogscispace.de"
-    #start_url = "https://www.uni-luebeck.de/universitaet/universitaet.html"
-    #start_url = "https://en.wikipedia.org/wiki/Knowledge_space"
-    relative_absolute_path = rel_ab_path
+    if relative_absolute_path:
+        relative_absolute_path = get_extra_path(start_url)
     
 
-    #not_allow = ["/en/"] # doesnt work for some reason
+    # below some arguments that can be adjusted accordingly
+
+    # do not allow certain urls based on the strings inside the list
+    #not_allow = ["/en/"] 
     not_allow = False
+    # whether to print each url that is visited or not
     print_search_url = True
-
+    # how many processes should be used 
     crawler_worker = 10
+    # how deep should be searched
     search_depth = 5
-
+    # pretty much obsolete because of fill_index.py 
     search_list = [start_url]
+    # the list containing all visited urls (also the ones with status!=200 etc.)
     already_visited = []
+    # how many urls should be searched in one crawl 
     doc_count = 0
     max_docs = 500
 
@@ -253,18 +245,19 @@ def crawl(start_url):
 
 if __name__ == '__main__':
     # in case arguments have been passed
-    #args = sys.argv[1:]
+    args = sys.argv[1:]
 
-    # default starting url    
-    start_url = "https://vm009.rz.uos.de/crawl"
-    #h_url = "https://whoosh.readthedocs.io"
-    # in case if search url needs extra path
-    #relative_absolute_path = '/crawl'
+    # default values if nothing is passed to main    
+    url = "https://vm009.rz.uos.de/crawl"
+    relative_absolute_path = True
 
-    
     # if args passed, use these instead
-    #if len(args) == 2 and args[0] == '-url':
-    #    url = args[1]
-    #    relative_absolute_path = False
+    if len(args) == 2 and args[0] == '-url':
+        url = args[1]
+        relative_absolute_path = False
+    
+    if len(args) == 4 and args[0] == '-url' and args[2] == '-path':
+        url = args[1]
+        relative_absolute_path = args[3]
 
-    crawl(start_url)
+    crawl(start_url=url, relative_absolute_path=relative_absolute_path)
