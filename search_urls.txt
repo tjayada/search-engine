@@ -1,0 +1,4 @@
+https://vm009.rz.uos.de/crawl, True
+https://www.cogscispace.de, False
+https://whoosh.readthedocs.io/en/latest/, True
+https://www.uni-osnabrueck.de/, False

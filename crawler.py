@@ -95,6 +95,7 @@ class Crawler(object):
                 return False
     return (
             '#' not in  found_url
+            and '..' not in found_url
             and not re.search(r'(.pdf)', found_url, re.IGNORECASE)
             and not re.search(r'(.doc)', found_url, re.IGNORECASE) 
             and not re.search(r'(.xml)', found_url, re.IGNORECASE)
@@ -116,14 +117,14 @@ class Crawler(object):
     headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'}
     while tries < 3:
         try:
-            response = requests.get(search_url, headers=headers)
+            response = requests.get(search_url, headers=headers, timeout=3)
             if response.status_code != 200:
                 raise TypeError
             return True, response
         except:
             time.sleep(tries)
             tries += 1
-    return False, response.status_code
+    return False, False
   
   def content_to_index(self, text, url):
     """write scraped content into index"""
@@ -147,7 +148,7 @@ class Crawler(object):
             print(search_url)
         if not code:
             if self.print_search_url:
-                print(response, "no response huh?")
+                print("no response huh?")
             return [], search_url
         
         host_url = self.get_host_url(search_url)
@@ -257,18 +258,17 @@ if __name__ == '__main__':
     args = sys.argv[1:]
 
     # default starting url    
-    url = "https://vm009.rz.uos.de/crawl"
-    #start_url = "https://whoosh.readthedocs.io/en/latest/"
+    #url = "https://vm009.rz.uos.de/crawl"
+    #url = "https://whoosh.readthedocs.io/en/latest/"
     # in case if search url needs extra path
     #relative_absolute_path = '/crawl'
     #start_url = "https://www.uni-osnabrueck.de/False/"
 
     #start_url = "https://www.wikipedia.org"
 
-    #start_url = "https://www.cogscispace.de"
-
+    url = "https://www.cogscispace.de"
     #url = "https://www.fh-kiel.de"
-    relative_absolute_path = False
+    relative_absolute_path = True
 
     # if args passed, use these instead
     if len(args) == 2 and args[0] == '-url':

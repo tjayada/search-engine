@@ -73,6 +73,20 @@ body {
     left: 45%;
 }
 
+.sorry_spide {
+    position: absolute;
+    height: 240px;
+    width: 200px;
+    left: 42%;
+    top: 20%;
+}
+
+.sorry_explained {
+    position: absolute;
+    left: 30%;
+    top: 60%;
+}
+
 .lower-container {
     position: relative;
     top:  160px;

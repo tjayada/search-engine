@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 from whoosh import index, highlight
 from whoosh.qparser import QueryParser, OrGroup
 from crawler import replace_punctuations, crawl
@@ -6,6 +6,7 @@ import requests
 import math
 import os
 import subprocess
+import random
 
 def check_url(search_url):
     """check user input url"""
@@ -40,6 +41,9 @@ def search():
     """display new searchbar and search results from previous search"""
     # number of results per page
     results_per_page = 5
+
+    # show spider in different colors ?
+    random_spider = False
 
     # get user input
     q = request.form['query']
@@ -86,13 +90,23 @@ def search():
 
     result_list = result_list[(p - 1) * results_per_page : (p) * results_per_page]
 
-    return render_template("results.html", result_list=result_list, user_query=q, page_number=p)
+    spider = "/static/spooder.png"
+    if random_spider:
+        spider = f"/static/spooder_{random.randint(1, 3)}.png"
+    
+
+    return render_template("results.html", result_list=result_list, user_query=q, page_number=p, spider=spider)
 
 
 
 @app.route('/reset_and_crawl', methods = ['POST', 'GET'])
 def recrawl():
     '''recrawls given website and redirects to homepage'''
+    
+    allow_crawl = False
+
+    if not allow_crawl:
+        return redirect(url_for('sorry'))
     
     url = request.form['start_url']
     
@@ -101,7 +115,7 @@ def recrawl():
 
     if url == "":
         url = "https://www.cogscispace.de"
-        
+
     if not check_url(url):
         print("bad url")
         return redirect(url_for('homepage'))
@@ -114,8 +128,16 @@ def recrawl():
     
     #crawl(url, relative_absolute_path=True)
     print(os.path.abspath(os.getcwd()))
-    subprocess.run([python_version, "crawler.py", "-url", url, "-path", "True"])
+    subprocess.call([python_version, "crawler.py", "-url", url, "-path", "True"])
     return redirect(url_for('homepage'))
+    
+    
    
+
+@app.route("/sorry")
+def sorry():
+    """in case the crawling function is prohibitedg"""
+    return render_template("sorry.html")
+
 if __name__ == '__main__':
     app.run(debug = True)
